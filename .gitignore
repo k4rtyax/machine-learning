@@ -1,10 +1,10 @@
 # Kredensial sensitif
 kaggle.json
 
-# File model (generate dari notebook)
-models/
-*.pkl
-*.h5
+# File model besar (uncomment jika melebihi 100MB)
+# models/
+# *.pkl
+# *.h5
 
 # Data besar
 data/
