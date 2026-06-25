@@ -1,6 +1,6 @@
 """
 Dashboard Sistem Deteksi Intrusi Jaringan (IDS)
-Menggunakan Machine Learning — CIC-IDS-2017 Dataset
+Menggunakan Machine Learning -- CIC-IDS-2017 Dataset
 """
 
 import streamlit as st
@@ -9,21 +9,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
-import io
 import os
 import warnings
 
 warnings.filterwarnings('ignore')
 
-# ─── Konfigurasi Halaman ───────────────────────────────────────────────────────
+# ── Konfigurasi Halaman ───────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="IDS Dashboard — ML",
-    page_icon="🛡️",
+    page_title="IDS Dashboard -- ML",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ─── CSS Kustom ───────────────────────────────────────────────────────────────
+# ── CSS Kustom ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
@@ -51,18 +50,6 @@ st.markdown("""
     h2 { color: #2563EB !important; font-weight: 600; }
     h3 { color: #1E40AF !important; }
 
-    .alert-normal {
-        background: #DCFCE7; border-left: 4px solid #16A34A;
-        padding: 12px 16px; border-radius: 8px; margin: 4px 0;
-        color: #166534; font-weight: 500;
-    }
-    .alert-attack {
-        background: #FEE2E2; border-left: 4px solid #DC2626;
-        padding: 12px 16px; border-radius: 8px; margin: 4px 0;
-        color: #7F1D1D; font-weight: 500;
-    }
-    .badge-normal { background:#16A34A; color:white; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; }
-    .badge-attack { background:#DC2626; color:white; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; }
     .info-card {
         background: white; border: 1px solid #E2E8F0;
         border-radius: 12px; padding: 20px;
@@ -72,20 +59,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Google Drive Model IDs ────────────────────────────────────────────────────
+# ── Google Drive Model IDs ─────────────────────────────────────────────────────
 # Isi dengan File ID dari Google Drive setelah training selesai
-# Cara ambil File ID: klik kanan file di Drive → "Get link" → salin ID dari URL
 GDRIVE_IDS = {
-    'rf_model.pkl':        '',   # TODO: isi setelah training
-    'xgb_model.pkl':       '',   # TODO: isi setelah training
-    'scaler.pkl':          '',   # TODO: isi setelah training
-    'feature_columns.pkl': '',   # TODO: isi setelah training
-    'ann_model.h5':        '',   # TODO: isi setelah training
+    'rf_model.pkl':        '',
+    'xgb_model.pkl':       '',
+    'scaler.pkl':          '',
+    'feature_columns.pkl': '',
+    'ann_model.h5':        '',
 }
 
-# ─── Auto-download Model dari Google Drive ────────────────────────────────────
+# ── Auto-download Model dari Google Drive ─────────────────────────────────────
 def download_models_from_drive():
-    """Download file model dari Google Drive jika belum ada di lokal."""
     try:
         import gdown
     except ImportError:
@@ -94,20 +79,17 @@ def download_models_from_drive():
     for fname, fid in GDRIVE_IDS.items():
         if not fid:
             continue
-        local_path = fname
-        # Cek di folder models/ dulu
-        if os.path.exists(os.path.join('models', fname)):
+        if os.path.exists(os.path.join('models', fname)) or os.path.exists(fname):
             continue
-        if not os.path.exists(local_path):
-            with st.spinner(f'Mengunduh {fname} dari Google Drive...'):
-                try:
-                    gdown.download(f'https://drive.google.com/uc?id={fid}', local_path, quiet=True)
-                except Exception:
-                    pass
+        with st.spinner(f'Mengunduh {fname} dari Google Drive...'):
+            try:
+                gdown.download(f'https://drive.google.com/uc?id={fid}', fname, quiet=True)
+            except Exception:
+                pass
 
 download_models_from_drive()
 
-# ─── Cari file model (root atau folder models/) ───────────────────────────────
+# ── Cari file model (root atau folder models/) ────────────────────────────────
 def find_model_file(fname):
     if os.path.exists(fname):
         return fname
@@ -116,7 +98,7 @@ def find_model_file(fname):
         return alt
     return None
 
-# ─── Load Model ───────────────────────────────────────────────────────────────
+# ── Load Model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_models():
     models = {}
@@ -134,7 +116,7 @@ def load_models():
         path = find_model_file('ann_model.h5')
         models['ann']    = load_model(path) if path else None
         models['ann_ok'] = models['ann'] is not None
-    except Exception as e:
+    except Exception:
         models['ann_ok'] = False
 
     try:
@@ -159,19 +141,15 @@ def load_models():
 
 models = load_models()
 
-# ─── Preprocessing ────────────────────────────────────────────────────────────
+# ── Preprocessing ─────────────────────────────────────────────────────────────
 def preprocess_input(df: pd.DataFrame, models: dict) -> np.ndarray:
-    """Preprocess CSV sesuai pipeline training CIC-IDS-2017 (numerik, StandardScaler)."""
     if not models.get('prep_ok'):
         raise ValueError("Preprocessor tidak ditemukan. Jalankan notebook training terlebih dahulu.")
 
     df = df.copy()
     df.columns = df.columns.str.strip()
-
-    # Ambil hanya kolom numerik
     df_num = df.select_dtypes(include=[np.number])
 
-    # Sinkronisasi dengan feature_cols dari training
     feat_cols = models.get('feature_cols')
     if feat_cols:
         for col in feat_cols:
@@ -179,38 +157,37 @@ def preprocess_input(df: pd.DataFrame, models: dict) -> np.ndarray:
                 df_num[col] = 0.0
         df_num = df_num[feat_cols]
 
-    # Ganti inf → NaN → 0
     df_num.replace([np.inf, -np.inf], np.nan, inplace=True)
     df_num.fillna(0, inplace=True)
 
     return models['scaler'].transform(df_num.values)
 
-# ─── Sidebar ──────────────────────────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 🛡️ IDS Dashboard")
-    st.markdown("**Machine Learning — CIC-IDS-2017**")
+    st.markdown("### IDS Dashboard")
+    st.markdown("**Machine Learning -- CIC-IDS-2017**")
     st.divider()
     halaman = st.radio(
         "Navigasi",
-        ["🏠 Beranda", "🔍 Prediksi", "📊 Evaluasi Model", "📈 Eksplorasi Data"],
+        ["Beranda", "Prediksi", "Evaluasi Model", "Eksplorasi Data"],
         label_visibility="collapsed"
     )
     st.divider()
 
     st.markdown("**Status Model:**")
-    for icon_key, label in [('rf_ok', 'Random Forest'), ('ann_ok', 'ANN (Keras)'),
-                             ('xgb_ok', 'XGBoost'), ('prep_ok', 'Preprocessor')]:
-        icon = "✅" if models.get(icon_key) else "❌"
-        st.markdown(f"{icon} {label}")
+    for key, label in [('rf_ok', 'Random Forest'), ('ann_ok', 'ANN (Keras)'),
+                        ('xgb_ok', 'XGBoost'), ('prep_ok', 'Preprocessor')]:
+        status = "OK" if models.get(key) else "Tidak ditemukan"
+        st.markdown(f"- {label}: **{status}**")
 
     if not any(models.get(k) for k in ['rf_ok', 'ann_ok', 'xgb_ok']):
-        st.warning("⚠️ Jalankan notebook training terlebih dahulu, lalu letakkan file .pkl & .h5 ke folder `models/`")
+        st.warning("Jalankan notebook training terlebih dahulu, lalu letakkan file .pkl & .h5 ke folder models/")
 
 # ═══════════════════════════════════════════════════════════════════
-# 🏠 HALAMAN BERANDA
+# HALAMAN BERANDA
 # ═══════════════════════════════════════════════════════════════════
-if halaman == "🏠 Beranda":
-    st.title("🛡️ Sistem Deteksi Intrusi Jaringan")
+if halaman == "Beranda":
+    st.title("Sistem Deteksi Intrusi Jaringan")
     st.markdown("#### Implementasi Machine Learning untuk Klasifikasi Serangan Siber")
     st.divider()
 
@@ -225,34 +202,34 @@ if halaman == "🏠 Beranda":
 
         Sistem menggunakan tiga model utama yang dikombinasikan dalam **Ensemble Soft Voting**:
 
-        - 🌲 **Random Forest** — ensemble decision tree dengan class weighting
-        - 🚀 **XGBoost** — gradient boosting dengan scale_pos_weight
-        - 🧠 **ANN** — deep learning dengan BatchNormalization & Dropout
+        - **Random Forest** — ensemble decision tree dengan class weighting
+        - **XGBoost** — gradient boosting dengan scale_pos_weight
+        - **ANN** — deep learning dengan BatchNormalization dan Dropout
 
         Sistem mengklasifikasikan trafik jaringan sebagai **Normal** atau **Attack** secara otomatis.
         """)
     with col2:
         st.markdown("""
         **Fitur Utama**
-        - 🔍 Prediksi real-time via upload CSV
-        - 📊 Evaluasi & perbandingan model
-        - 📈 Eksplorasi data interaktif
-        - 💾 Download hasil prediksi
+        - Prediksi real-time via upload CSV
+        - Evaluasi dan perbandingan model
+        - Eksplorasi data interaktif
+        - Download hasil prediksi
         """)
 
     st.divider()
 
-    st.markdown("### 📊 Statistik Dataset CIC-IDS-2017")
+    st.markdown("### Statistik Dataset CIC-IDS-2017")
     col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Total Sampel",    "~2.8 Juta",  "CIC-IDS-2017")
-    col2.metric("Data Training",   "~2 Juta",    "80% stratified")
-    col3.metric("Data Testing",    "~504 Ribu",  "20% stratified")
-    col4.metric("Jumlah Fitur",    "52",         "numerik")
-    col5.metric("Kelas Serangan",  "14 jenis",   "Binary: Normal vs Attack")
+    col1.metric("Total Sampel",   "~2.8 Juta",  "CIC-IDS-2017")
+    col2.metric("Data Training",  "~2 Juta",    "80% stratified")
+    col3.metric("Data Testing",   "~504 Ribu",  "20% stratified")
+    col4.metric("Jumlah Fitur",   "52",         "numerik")
+    col5.metric("Kelas Serangan", "14 jenis",   "Binary: Normal vs Attack")
 
     st.divider()
 
-    st.markdown("### 🎯 Kategori Serangan CIC-IDS-2017")
+    st.markdown("### Kategori Serangan CIC-IDS-2017")
     attack_info = {
         "DoS / DDoS": {
             "warna": "#EF4444",
@@ -288,10 +265,10 @@ if halaman == "🏠 Beranda":
             """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════
-# 🔍 HALAMAN PREDIKSI
+# HALAMAN PREDIKSI
 # ═══════════════════════════════════════════════════════════════════
-elif halaman == "🔍 Prediksi":
-    st.title("🔍 Prediksi Intrusi Jaringan")
+elif halaman == "Prediksi":
+    st.title("Prediksi Intrusi Jaringan")
     st.markdown("Upload file CSV berisi data trafik jaringan CIC-IDS-2017 untuk mendapatkan prediksi.")
     st.divider()
 
@@ -305,27 +282,27 @@ elif halaman == "🔍 Prediksi":
         model_choice = st.selectbox("Pilih Model", options=model_options)
     with col_opt2:
         threshold = st.slider("Threshold Prediksi Attack", 0.3, 0.9, 0.5, 0.05,
-                              help="Probabilitas di atas nilai ini → diklasifikasikan sebagai Attack")
+                              help="Probabilitas di atas nilai ini akan diklasifikasikan sebagai Attack")
 
     st.divider()
 
     feat_cols = models.get('feature_cols')
-    with st.expander("ℹ️ Format File CSV yang Diperlukan"):
+    with st.expander("Format File CSV yang Diperlukan"):
         if feat_cols:
             st.markdown(f"File CSV harus memiliki **{len(feat_cols)} kolom numerik** berikut (fitur CIC-IDS-2017):")
             st.code(", ".join(feat_cols))
         else:
             st.info("Load model terlebih dahulu untuk melihat daftar kolom yang diperlukan.")
-        st.markdown("Kolom label (`Attack Type`, `Label`, dll.) tidak perlu disertakan.")
+        st.markdown("Kolom label (Attack Type, Label, dll.) tidak perlu disertakan.")
 
     uploaded_file = st.file_uploader("Upload File CSV", type=['csv', 'txt'])
 
     if uploaded_file is not None:
         try:
             df_input = pd.read_csv(uploaded_file)
-            st.success(f"✅ File berhasil dimuat: **{df_input.shape[0]:,} baris, {df_input.shape[1]} kolom**")
+            st.success(f"File berhasil dimuat: **{df_input.shape[0]:,} baris, {df_input.shape[1]} kolom**")
 
-            with st.expander("👁️ Preview Data (5 baris pertama)"):
+            with st.expander("Preview Data (5 baris pertama)"):
                 st.dataframe(df_input.head(), use_container_width=True)
 
             model_ready = (
@@ -334,11 +311,11 @@ elif halaman == "🔍 Prediksi":
                 (model_choice == "XGBoost"       and models.get('xgb_ok'))
             )
 
-            if st.button("🚀 Jalankan Prediksi", type="primary", use_container_width=True):
+            if st.button("Jalankan Prediksi", type="primary", use_container_width=True):
                 if not model_ready:
-                    st.error(f"❌ Model {model_choice} tidak tersedia. Letakkan file model ke folder `models/`.")
+                    st.error(f"Model {model_choice} tidak tersedia. Letakkan file model ke folder models/.")
                 else:
-                    with st.spinner("Memproses data & melakukan prediksi..."):
+                    with st.spinner("Memproses data dan melakukan prediksi..."):
                         X = preprocess_input(df_input, models)
 
                         if model_choice == "Random Forest":
@@ -348,24 +325,23 @@ elif halaman == "🔍 Prediksi":
                         else:
                             y_prob = models['ann'].predict(X, verbose=0).flatten()
 
-                        y_pred = (y_prob >= threshold).astype(int)
-                        labels = ['🟢 Normal' if p == 0 else '🔴 Attack' for p in y_pred]
+                        y_pred  = (y_prob >= threshold).astype(int)
+                        labels  = ['Normal' if p == 0 else 'Attack' for p in y_pred]
+                        n_normal = int(sum(y_pred == 0))
+                        n_attack = int(sum(y_pred == 1))
+                        total    = len(y_pred)
 
                         df_result = df_input.copy()
                         df_result['Prediksi']     = labels
                         df_result['Probabilitas'] = np.round(y_prob, 4)
                         df_result['Kelas']        = y_pred
 
-                        n_normal = int(sum(y_pred == 0))
-                        n_attack = int(sum(y_pred == 1))
-                        total    = len(y_pred)
-
                         st.divider()
-                        st.markdown("### 📋 Hasil Prediksi")
+                        st.markdown("### Hasil Prediksi")
                         m1, m2, m3, m4 = st.columns(4)
                         m1.metric("Total Sampel", f"{total:,}")
-                        m2.metric("🟢 Normal",    f"{n_normal:,}", f"{n_normal/total*100:.1f}%")
-                        m3.metric("🔴 Attack",    f"{n_attack:,}", f"{n_attack/total*100:.1f}%")
+                        m2.metric("Normal",       f"{n_normal:,}", f"{n_normal/total*100:.1f}%")
+                        m3.metric("Attack",       f"{n_attack:,}", f"{n_attack/total*100:.1f}%")
                         m4.metric("Threshold",    threshold)
 
                         preview_cols = ['Prediksi', 'Probabilitas'] + list(df_input.columns[:5])
@@ -384,7 +360,7 @@ elif halaman == "🔍 Prediksi":
 
                         csv_out = df_result.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            "💾 Download Hasil Prediksi (CSV)",
+                            "Download Hasil Prediksi (CSV)",
                             data=csv_out,
                             file_name='hasil_prediksi_ids.csv',
                             mime='text/csv',
@@ -392,21 +368,20 @@ elif halaman == "🔍 Prediksi":
                         )
 
         except Exception as e:
-            st.error(f"❌ Error memproses file: {e}")
+            st.error(f"Error memproses file: {e}")
             st.info("Pastikan file CSV berisi fitur numerik CIC-IDS-2017.")
     else:
-        st.info("👆 Upload file CSV untuk memulai prediksi")
+        st.info("Upload file CSV untuk memulai prediksi.")
 
 # ═══════════════════════════════════════════════════════════════════
-# 📊 HALAMAN EVALUASI MODEL
+# HALAMAN EVALUASI MODEL
 # ═══════════════════════════════════════════════════════════════════
-elif halaman == "📊 Evaluasi Model":
-    st.title("📊 Evaluasi & Perbandingan Model")
+elif halaman == "Evaluasi Model":
+    st.title("Evaluasi dan Perbandingan Model")
     st.markdown("Perbandingan performa model machine learning pada dataset CIC-IDS-2017.")
     st.divider()
 
-    st.markdown("### 🏆 Tabel Perbandingan Performa Model")
-
+    st.markdown("### Tabel Perbandingan Performa Model")
     df_eval = pd.DataFrame({
         'Model':      ['XGBoost', 'Ensemble (RF+XGB+ANN)', 'Decision Tree', 'Random Forest', 'ANN', 'Naive Bayes'],
         'Accuracy':   [0.9987, 0.9987, 0.9986, 0.9984, 0.9794, 0.7754],
@@ -422,12 +397,12 @@ elif halaman == "📊 Evaluasi Model":
 
     styled = df_eval.style.apply(highlight_best).format("{:.4f}")
     st.dataframe(styled, use_container_width=True)
-    st.caption("Hasil evaluasi aktual — CIC-IDS-2017, 300k sampel, split 80:20 stratified. Model terbaik: **XGBoost** (Accuracy 99.87%, ROC-AUC 1.0000)")
+    st.caption("Hasil evaluasi aktual -- CIC-IDS-2017, 300k sampel, split 80:20 stratified. Model terbaik: XGBoost (Accuracy 99.87%, ROC-AUC 1.0000)")
     st.divider()
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("### 📈 Grafik Perbandingan Metrik")
+        st.markdown("### Grafik Perbandingan Metrik")
         fig, ax = plt.subplots(figsize=(8, 5))
         x = np.arange(len(df_eval.index))
         width = 0.18
@@ -446,7 +421,7 @@ elif halaman == "📊 Evaluasi Model":
         plt.close()
 
     with col2:
-        st.markdown("### 🔲 Confusion Matrix")
+        st.markdown("### Confusion Matrix")
         if models.get('rf_ok') and models.get('prep_ok'):
             st.info("Upload data test untuk melihat Confusion Matrix aktual.")
         else:
@@ -454,10 +429,10 @@ elif halaman == "📊 Evaluasi Model":
 
     st.divider()
 
-    st.markdown("### 🌟 Feature Importance — Random Forest")
+    st.markdown("### Feature Importance -- Random Forest")
     if models.get('rf_ok') and models.get('feature_cols'):
         feat_imp = pd.DataFrame({
-            'Fitur': models['feature_cols'],
+            'Fitur':      models['feature_cols'],
             'Importance': models['rf'].feature_importances_
         }).sort_values('Importance', ascending=False).head(10)
 
@@ -468,7 +443,7 @@ elif halaman == "📊 Evaluasi Model":
         for bar, val in zip(bars, feat_imp['Importance'][::-1]):
             ax.text(bar.get_width() + 0.001, bar.get_y() + bar.get_height() / 2,
                     f'{val:.4f}', va='center', fontsize=10, fontweight='bold')
-        ax.set_title('Top 10 Feature Importance — Random Forest (CIC-IDS-2017)',
+        ax.set_title('Top 10 Feature Importance -- Random Forest (CIC-IDS-2017)',
                      fontsize=13, fontweight='bold')
         ax.set_xlabel('Importance Score', fontsize=11)
         ax.grid(axis='x', alpha=0.3)
@@ -479,20 +454,19 @@ elif halaman == "📊 Evaluasi Model":
         st.info("Load model Random Forest untuk melihat Feature Importance aktual.")
 
 # ═══════════════════════════════════════════════════════════════════
-# 📈 HALAMAN EDA
+# HALAMAN EKSPLORASI DATA
 # ═══════════════════════════════════════════════════════════════════
-elif halaman == "📈 Eksplorasi Data":
-    st.title("📈 Eksplorasi Data CIC-IDS-2017")
+elif halaman == "Eksplorasi Data":
+    st.title("Eksplorasi Data CIC-IDS-2017")
     st.divider()
 
-    st.markdown("### 🏷️ Distribusi Label")
+    st.markdown("### Distribusi Label")
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("**Binary Label (Normal vs Attack)**")
         fig, ax = plt.subplots(figsize=(6, 4))
-        counts_bin = [1446882, 1073708]
-        ax.pie(counts_bin, labels=['Normal', 'Attack'],
+        ax.pie([1446882, 1073708], labels=['Normal', 'Attack'],
                autopct='%1.1f%%', colors=['#16A34A', '#DC2626'],
                startangle=90, textprops={'fontsize': 12})
         ax.set_title('Distribusi Binary Label (sebelum cleaning)', fontsize=12, fontweight='bold')
@@ -503,8 +477,8 @@ elif halaman == "📈 Eksplorasi Data":
     with col2:
         st.markdown("**Per Jenis Serangan (Top 10)**")
         fig, ax = plt.subplots(figsize=(6, 4))
-        cats = ['BENIGN', 'DoS Hulk', 'PortScan', 'DDoS', 'DoS GoldenEye',
-                'FTP-Patator', 'SSH-Patator', 'DoS Slowloris', 'DoS Slowhttptest', 'Bot']
+        cats   = ['BENIGN', 'DoS Hulk', 'PortScan', 'DDoS', 'DoS GoldenEye',
+                  'FTP-Patator', 'SSH-Patator', 'DoS Slowloris', 'DoS Slowhttptest', 'Bot']
         counts = [1446882, 231073, 158930, 128027, 10293, 7938, 5897, 5796, 5499, 1966]
         colors = ['#16A34A'] + ['#EF4444'] * 9
         bars = ax.barh(cats[::-1], counts[::-1], color=colors[::-1])
@@ -519,7 +493,7 @@ elif halaman == "📈 Eksplorasi Data":
         plt.close()
 
     st.divider()
-    st.markdown("### 📋 Deskripsi Fitur CIC-IDS-2017")
+    st.markdown("### Deskripsi Fitur CIC-IDS-2017")
 
     if models.get('feature_cols'):
         feat_info = pd.DataFrame({
@@ -538,12 +512,12 @@ elif halaman == "📈 Eksplorasi Data":
         - Laju pengiriman: byte/s, packet/s
         - Window size, header length
         - IAT (Inter-Arrival Time): mean, std, max, min
-        - Subflow: bytes & packets forward/backward
+        - Subflow: bytes dan packets forward/backward
         """)
 
     st.divider()
-    st.markdown("### 🔥 Heatmap Korelasi (Ilustrasi)")
-    st.caption("⚠️ Heatmap di bawah merupakan ilustrasi. Heatmap aktual tersedia setelah menjalankan notebook EDA.")
+    st.markdown("### Heatmap Korelasi (Ilustrasi)")
+    st.caption("Heatmap di bawah merupakan ilustrasi. Heatmap aktual tersedia setelah menjalankan notebook EDA.")
 
     top15 = [
         'Flow Duration', 'Total Fwd Packets', 'Total Backward Packets',
@@ -566,7 +540,7 @@ elif halaman == "📈 Eksplorasi Data":
     sns.heatmap(corr_df, mask=mask, annot=True, fmt='.2f', cmap='RdYlGn',
                 center=0, linewidths=0.4, ax=ax, annot_kws={'size': 7.5},
                 cbar_kws={'shrink': 0.75})
-    ax.set_title('Heatmap Korelasi — Top 15 Fitur CIC-IDS-2017 (Ilustrasi)',
+    ax.set_title('Heatmap Korelasi -- Top 15 Fitur CIC-IDS-2017 (Ilustrasi)',
                  fontsize=14, fontweight='bold', pad=12)
     plt.tight_layout()
     st.pyplot(fig, use_container_width=True)
