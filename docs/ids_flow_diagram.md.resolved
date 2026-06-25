@@ -1,0 +1,124 @@
+# Flow Diagram — IDS CICIDS 2017 Notebook
+
+## Pipeline Overview
+
+```mermaid
+flowchart TD
+    subgraph S1["1. Install & Import Library"]
+        A1["pip install tensorflow, scikit-learn,\npandas, numpy, matplotlib,\nseaborn, joblib, xgboost"]
+        A2["Import semua library:\nPandas, NumPy, Sklearn,\nXGBoost"]
+        A3["Set random seed = 42"]
+        A1 --> A2 --> A3
+    end
+
+    subgraph S2["2. Download Dataset"]
+        B1["Cek file cicids2017_cleaned.csv"]
+        B2{"File ada?"}
+        B3["Load dari path lokal"]
+        B4["Download dari Kaggle:\nericanacletoribeiro/cicids2017"]
+        B1 --> B2
+        B2 -->|Ya| B3
+        B2 -->|Tidak| B4
+    end
+
+    subgraph S3["3. Load & Gabungkan Dataset"]
+        C1["pd.read_csv cicids2017_cleaned.csv"]
+        C2["Strip whitespace kolom"]
+        C3["Identifikasi kolom label:\nAttack Type"]
+        C4["Tampilkan distribusi label\n& info dataset"]
+        C1 --> C2 --> C3 --> C4
+    end
+
+    subgraph S4["4. Exploratory Data Analysis"]
+        D1["Buat binary_label:\n0 = Normal, 1 = Attack"]
+        D2["Pie Chart: Normal vs Attack"]
+        D3["Bar Chart: Distribusi\njenis traffic"]
+        D4["Cek Missing & Inf values"]
+        D5["Top 15 Fitur — Korelasi\ndengan label"]
+        D6["Heatmap Korelasi\nTop 10 Fitur"]
+        D1 --> D2 --> D3
+        D1 --> D4 --> D5 --> D6
+    end
+
+    subgraph S5["5. Preprocessing"]
+        E1["Binary Label Encoding:\n0=Normal, 1=Attack"]
+        E2["Replace inf → NaN\nlalu drop rows"]
+        E3["Drop duplikat"]
+        E4["Pisah fitur numerik X\ndan label y"]
+        E5["Train-Test Split\n80/20 stratified"]
+        E6["StandardScaler:\nfit_transform train\ntransform test"]
+        E7["Simpan:\nscaler.pkl\nfeature_columns.pkl"]
+        E1 --> E2 --> E3 --> E4 --> E5 --> E6 --> E7
+    end
+
+    subgraph S6["6. Training — Random Forest"]
+        F1["RandomForestClassifier:\nn_estimators=200\nmax_depth=20\nclass_weight=balanced"]
+        F2["fit pada X_train_scaled"]
+        F3["predict & predict_proba\npada X_test_scaled"]
+        F4["Simpan rf_model.pkl"]
+        F1 --> F2 --> F3 --> F4
+    end
+
+    subgraph S7["7. Training — XGBoost"]
+        G1["XGBClassifier:\nn_estimators=200\nmax_depth=8\nlearning_rate=0.1"]
+        G2["scale_pos_weight\nuntuk imbalanced data"]
+        G3["fit pada X_train_scaled"]
+        G4["predict & predict_proba\npada X_test_scaled"]
+        G5["Simpan xgb_model.pkl"]
+        G1 --> G2 --> G3 --> G4 --> G5
+    end
+
+    subgraph S8["8. Evaluasi & Perbandingan"]
+        H1["Ensemble Soft Voting:\nRF + XGB / 2\nthreshold = 0.45"]
+        H2["Evaluate semua model:\nAccuracy, Precision,\nRecall, F1, ROC-AUC"]
+        H3["Tabel Perbandingan\n3 Model"]
+        H4["Confusion Matrix:\nRF vs XGBoost"]
+        H5["ROC-AUC Curve\nsemua model"]
+        H6["Feature Importance\nTop 10 dari RF"]
+        H7["Classification Report\nRF & XGBoost detail"]
+        H1 --> H2 --> H3
+        H2 --> H4
+        H2 --> H5
+        H2 --> H6
+        H2 --> H7
+    end
+
+    subgraph S9["9. Kesimpulan"]
+        I1["Ringkasan Hasil:\nModel terbaik + metrik"]
+        I2["Info file yang disimpan:\nrf_model.pkl\nxgb_model.pkl\nscaler.pkl\nfeature_columns.pkl"]
+        I1 --> I2
+    end
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9
+```
+
+## Model Architecture Summary
+
+```mermaid
+flowchart LR
+    subgraph Models["3 Model yang Digunakan"]
+        direction TB
+        M1["Random Forest\n200 trees, depth=20"]
+        M2["XGBoost\n200 trees, depth=8"]
+        M3["Ensemble\nSoft Voting RF+XGB"]
+    end
+
+    Data["CICIDS 2017\ncicids2017_cleaned.csv\n~685 MB"] --> Prep["Preprocessing\nScale + Split 80/20"]
+    Prep --> M1 & M2
+    M1 & M2 --> M3
+    M1 & M2 & M3 --> Eval["Evaluasi\nAccuracy, F1,\nROC-AUC"]
+    Eval --> Best["Model Terbaik"]
+```
+
+## Preprocessing Pipeline Detail
+
+```mermaid
+flowchart LR
+    Raw["Raw CSV\nCICIDS 2017"] --> Label["Label Encoding\nNormal=0\nAttack=1"]
+    Label --> Clean1["Replace\ninf → NaN"]
+    Clean1 --> Clean2["Drop NaN\nrows"]
+    Clean2 --> Dedup["Drop\nDuplikat"]
+    Dedup --> Split["Train/Test\n80/20\nStratified"]
+    Split --> Scale["StandardScaler\nfit_transform"]
+    Scale --> Ready["Data Siap\nuntuk Training"]
+```

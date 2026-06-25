@@ -1,0 +1,19 @@
+# Kredensial sensitif
+kaggle.json
+
+# File model (generate dari notebook)
+models/
+*.pkl
+*.h5
+
+# Data besar
+data/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environment
+.env
+venv/
