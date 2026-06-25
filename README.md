@@ -1,19 +1,25 @@
-# Machine Learning Project
+# Sistem Deteksi Intrusi Jaringan (IDS)
 
-### Implementasi Sistem Deteksi Intrusi Jaringan Menggunakan Machine Learning untuk Klasifikasi Serangan Siber pada Server Linux
+Implementasi Machine Learning untuk klasifikasi serangan siber menggunakan dataset CIC-IDS-2017.
 
-(Notebook + Dashboard Streamlit) karena:
+**Live Demo:** [machine-learning-ta.streamlit.app](https://machine-learning-ta.streamlit.app)
 
-*   **Notebook**: Dokumentasi proses untuk juri teknis.
-*   **Streamlit**: Demo interaktif untuk presentasi, bisa diakses siapapun lewat browser.
+## Model
+| Model | Accuracy | ROC-AUC |
+|-------|----------|---------|
+| XGBoost | 99.87% | 1.0000 |
+| Ensemble (RF+XGB+ANN) | 99.87% | 0.9999 |
+| Random Forest | 99.84% | 0.9999 |
+| ANN | 97.94% | 0.9988 |
 
-### Project Workflow & UI
-![Workflow](flow.png)
-![Dashboard Preview](image.png)
+## Dataset
+[CIC-IDS-2017](https://www.unb.ca/cic/datasets/ids-2017.html) — Canadian Institute for Cybersecurity, ~2.8 juta sampel, 52 fitur numerik, 14 jenis serangan.
 
-### Datasets
-*   [NSL-KDD (Kaggle)](https://www.kaggle.com/datasets/hassan06/nslkdd)
-*   [IoMT Dataset 2024 (UNB CIC)](https://www.unb.ca/cic/datasets/iomt-dataset-2024.html)
-*   [UNB CIC Official](https://www.unb.ca/cic)
-*   [UNSW-NB15 (Official Project)](https://research.unsw.edu.au/projects/unsw-nb15-dataset)
-*   [UNSW-NB15 (Kaggle)](https://kaggle.com/datasets/mrwellsdavid/unsw-nb15)
+## Struktur
+```
+machine-learning/
+├── app.py              # Streamlit dashboard
+├── models/             # Model hasil training (.pkl, .h5)
+├── notebooks/          # Notebook training & EDA
+└── docs/               # Laporan dan dokumentasi
+```
